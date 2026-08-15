@@ -1,0 +1,122 @@
+# =============================================
+# MiddlewareAuth — local docker-compose
+# Attaches to existing Traefik network (coolify).
+# Traefik service itself is defined in traefik-proxy.yml.
+# =============================================
+
+name: middleware-auth
+
+networks:
+  coolify:
+    external: true
+    name: coolify
+
+services:
+  # --- Database ------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: auth-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: auth
+      POSTGRES_PASSWORD: auth
+      POSTGRES_DB: auth
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U auth -d auth"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - coolify
+    # NOT exposed to Traefik (no labels)
+
+  # --- Redis ---------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: auth-redis
+    restart: unless-stopped
+    command: redis-server --save 60 1 --loglevel warning
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - coolify
+    # NOT exposed to Traefik
+
+  # --- Auth Server ---------------------------------------------------
+  auth-server:
+    build:
+      context: ./auth-server
+      dockerfile: Dockerfile
+    container_name: auth-server
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://auth:auth@postgres:5432/auth
+      REDIS_URL: redis://redis:6379
+      AUTH_SECRET: ${AUTH_SECRET:?AUTH_SECRET required}
+      AUTH_URL: ${AUTH_URL:-https://auth.burakaydogan.tk}
+      AUTH_TRUST_HOST: "true"
+      JWT_PRIVATE_KEY: ${JWT_PRIVATE_KEY:?JWT_PRIVATE_KEY required}
+      JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY:?JWT_PUBLIC_KEY required}
+      EXPO_ACCESS_TOKEN: ${EXPO_ACCESS_TOKEN:-}
+      APPROVAL_MODE: ${APPROVAL_MODE:-push}
+      APPROVAL_TTL_SECONDS: ${APPROVAL_TTL_SECONDS:-300}
+      NUMERIC_CODE_LENGTH: ${NUMERIC_CODE_LENGTH:-6}
+      NODE_ENV: production
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - coolify
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.auth.rule=Host(`${PUBLIC_HOST:-auth.burakaydogan.tk}`)
+      - traefik.http.routers.auth.entrypoints=https
+      - traefik.http.routers.auth.tls=true
+      - traefik.http.routers.auth.tls.certresolver=letsencrypt
+      - traefik.http.services.auth.loadbalancer.server.port=3000
+      # forwardAuth middleware (used by other routers)
+      - traefik.http.middlewares.auth-gateway.forwardauth.address=http://auth-server:3000/api/verify
+      - traefik.http.middlewares.auth-gateway.forwardauth.trustForwardHeader=true
+      - traefik.http.middlewares.auth-gateway.forwardauth.authResponseHeaders=X-Forwarded-User,X-Forwarded-Email
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # --- Demo App (protected example) ----------------------------------
+  demo-app:
+    build:
+      context: ./demo-app
+      dockerfile: Dockerfile
+    container_name: demo-app
+    restart: unless-stopped
+    environment:
+      AUTH_SERVER_URL: http://auth-server:3000
+      DEMO_OAUTH_CLIENT_ID: ${DEMO_OAUTH_CLIENT_ID:-demo-app}
+      NODE_ENV: production
+    depends_on:
+      - auth-server
+    networks:
+      - coolify
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.demo.rule=Host(`${DEMO_HOST:-demo.burakaydogan.tk}`)
+      - traefik.http.routers.demo.entrypoints=https
+      - traefik.http.routers.demo.tls=true
+      - traefik.http.routers.demo.tls.certresolver=letsencrypt
+      - traefik.http.routers.demo.middlewares=auth-gateway@docker
+      - traefik.http.services.demo.loadbalancer.server.port=3000
+
+volumes:
+  pg_data:
+  redis_data:

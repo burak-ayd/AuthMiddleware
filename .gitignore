@@ -1,0 +1,48 @@
+# Node / Next.js
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+next-env.d.ts
+
+# Env
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Prisma
+auth-server/prisma/migrations/dev.db*
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# EAS / Expo
+phone-app/.expo/
+phone-app/dist/
+phone-app/android/build/
+phone-app/android/.gradle/
+phone-app/android/app/build/
+phone-app/.eas/
+
+# Keys (never commit)
+*.pem
+*.key
+*.jks
+*.p8
+
+# Volumes (local dev data)
+.docker-data/

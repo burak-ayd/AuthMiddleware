@@ -1,0 +1,144 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =====================================================================
+// Users
+// =====================================================================
+
+enum ApprovalMode {
+  push
+  numeric
+  both
+}
+
+model User {
+  id            String        @id @default(cuid())
+  email         String        @unique
+  passwordHash  String
+  displayName   String?
+  approvalMode  ApprovalMode  @default(push)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  devices       Device[]
+  oauthCodes    OAuthCode[]
+  approvals     PendingApproval[]
+  sessions      Session[]
+}
+
+// =====================================================================
+// Devices (phone app registrations)
+// =====================================================================
+
+model Device {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expoPushToken String   @unique
+  platform      String   @default("android")
+  appVersion    String?
+  lastSeen      DateTime @default(now())
+
+  @@index([userId])
+}
+
+// =====================================================================
+// OAuth2 / OIDC clients
+// =====================================================================
+
+enum ClientType {
+  public
+  confidential
+}
+
+model OAuthClient {
+  id                  String        @id @default(cuid())
+  clientId            String        @unique
+  clientSecretHash    String?       // null for public clients
+  name                String
+  redirectUris        String[]      // exact match required
+  allowedScopes       String        @default("openid profile email")
+  type                ClientType    @default(confidential)
+  approvalModeOverride ApprovalMode?
+  createdAt           DateTime      @default(now())
+
+  oauthCodes          OAuthCode[]
+  approvals           PendingApproval[]
+}
+
+// =====================================================================
+// Authorization codes (PKCE)
+// =====================================================================
+
+model OAuthCode {
+  code                String    @id
+  clientId            String
+  client              OAuthClient @relation(fields: [clientId], references: [clientId], onDelete: Cascade)
+  userId              String
+  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  redirectUri         String
+  scope               String
+  codeChallenge       String?
+  codeChallengeMethod String?
+  expiresAt           DateTime
+  consumedAt          DateTime?
+  createdAt           DateTime  @default(now())
+
+  @@index([userId])
+}
+
+// =====================================================================
+// Pending approvals (phone push / numeric code)
+// =====================================================================
+
+enum ApprovalStatus {
+  pending
+  approved
+  denied
+  expired
+}
+
+model PendingApproval {
+  id              String         @id @default(cuid())
+  userId          String
+  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clientId        String
+  client          OAuthClient    @relation(fields: [clientId], references: [clientId], onDelete: Cascade)
+  requestedScope  String
+  appHost         String         // for display in notification + login screen
+  status          ApprovalStatus @default(pending)
+  numericCode     String?        // null when push-only
+  expiresAt       DateTime
+  createdAt       DateTime       @default(now())
+  respondedAt     DateTime?
+
+  // PKCE fields carried through approval
+  codeChallenge       String?
+  codeChallengeMethod String?
+
+  @@index([userId, status])
+  @@index([expiresAt])
+}
+
+// =====================================================================
+// Sessions (NextAuth JWT — stored only for audit/revocation)
+// =====================================================================
+
+model Session {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userAgent   String?
+  ip          String?
+  expiresAt   DateTime
+  revokedAt   DateTime?
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+}
