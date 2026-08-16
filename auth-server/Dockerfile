@@ -42,7 +42,8 @@ COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
 USER nextjs
 EXPOSE 3000
 
+# 127.0.0.1 (IPv4 literal) avoids IPv6 ::1 resolution. No -4 flag: BusyBox wget lacks it.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-  CMD wget -4 -qO- http://127.0.0.1:3000/api/health || exit 1
+  CMD wget -qO- http://127.0.0.1:3000/api/health || exit 1
 
 CMD ["node", "server.js"]
