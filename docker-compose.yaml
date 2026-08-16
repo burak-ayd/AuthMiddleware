@@ -89,29 +89,3 @@ services:
       timeout: 5s
       start_period: 15s
       retries: 3
-
-  # --- Demo App (protected example) ----------------------------------
-  demo-app:
-    build:
-      context: ./demo-app
-      dockerfile: Dockerfile
-    container_name: demo-app
-    restart: unless-stopped
-    environment:
-      PORT: "3001"
-      AUTH_SERVER_URL: http://auth-server:3000
-      DEMO_OAUTH_CLIENT_ID: ${DEMO_OAUTH_CLIENT_ID:-demo-app}
-      NODE_ENV: production
-    depends_on:
-      - auth-server
-    labels:
-      - coolify.managed=true
-      - traefik.enable=true
-      - traefik.docker.network=coolify
-      - traefik.http.routers.demo.rule=Host(`demo.burakaydogan.tk`)
-      - traefik.http.routers.demo.entrypoints=https
-      - traefik.http.routers.demo.tls=true
-      - traefik.http.routers.demo.tls.certresolver=letsencrypt
-      - traefik.http.routers.demo.middlewares=auth-gateway@file
-      - traefik.http.routers.demo.service=demo-svc
-      - traefik.http.services.demo-svc.loadbalancer.server.port=3001
