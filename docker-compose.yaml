@@ -60,6 +60,10 @@ services:
       APPROVAL_TTL_SECONDS: ${APPROVAL_TTL_SECONDS:-300}
       NUMERIC_CODE_LENGTH: ${NUMERIC_CODE_LENGTH:-6}
       NODE_ENV: production
+      # Docker runtime overrides HOSTNAME with the container ID, which breaks
+      # Next.js standalone (server.js binds to process.env.HOSTNAME).
+      # Pin it explicitly so the server listens on all interfaces.
+      HOSTNAME: "0.0.0.0"
     depends_on:
       postgres:
         condition: service_healthy
@@ -79,9 +83,11 @@ services:
       # (file provider) so it exists even when this container is down.
       # Reference it as: auth-gateway@file
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+      # -4 + 127.0.0.1: avoid IPv6 (::1) resolution inside Alpine (server listens IPv4 only)
+      test: ["CMD", "wget", "-4", "-qO-", "http://127.0.0.1:3000/api/health"]
       interval: 30s
       timeout: 5s
+      start_period: 15s
       retries: 3
 
   # --- Demo App (protected example) ----------------------------------
