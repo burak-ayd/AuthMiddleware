@@ -6,11 +6,6 @@
 
 name: middleware-auth
 
-networks:
-  coolify:
-    external: true
-    name: coolify
-
 services:
   # --- Database ------------------------------------------------------
   postgres:
@@ -28,8 +23,6 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
-    networks:
-      - coolify
     # NOT exposed to Traefik (no labels)
 
   # --- Redis ---------------------------------------------------------
@@ -45,8 +38,6 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
-    networks:
-      - coolify
     # NOT exposed to Traefik
 
   # --- Auth Server ---------------------------------------------------
@@ -74,15 +65,16 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    networks:
-      - coolify
     labels:
+      - coolify.managed=true
       - traefik.enable=true
+      - traefik.docker.network=coolify
       - traefik.http.routers.auth.rule=Host(`${PUBLIC_HOST:-auth.burakaydogan.tk}`)
       - traefik.http.routers.auth.entrypoints=https
       - traefik.http.routers.auth.tls=true
       - traefik.http.routers.auth.tls.certresolver=letsencrypt
-      - traefik.http.services.auth.loadbalancer.server.port=3000
+      - traefik.http.routers.auth.service=auth-svc
+      - traefik.http.services.auth-svc.loadbalancer.server.port=3000
       # forwardAuth middleware (used by other routers)
       - traefik.http.middlewares.auth-gateway.forwardauth.address=http://auth-server:3000/api/verify
       - traefik.http.middlewares.auth-gateway.forwardauth.trustForwardHeader=true
@@ -106,17 +98,14 @@ services:
       NODE_ENV: production
     depends_on:
       - auth-server
-    networks:
-      - coolify
     labels:
+      - coolify.managed=true
       - traefik.enable=true
+      - traefik.docker.network=coolify
       - traefik.http.routers.demo.rule=Host(`${DEMO_HOST:-demo.burakaydogan.tk}`)
       - traefik.http.routers.demo.entrypoints=https
       - traefik.http.routers.demo.tls=true
       - traefik.http.routers.demo.tls.certresolver=letsencrypt
       - traefik.http.routers.demo.middlewares=auth-gateway@docker
-      - traefik.http.services.demo.loadbalancer.server.port=3000
-
-volumes:
-  pg_data:
-  redis_data:
+      - traefik.http.routers.demo.service=demo-svc
+      - traefik.http.services.demo-svc.loadbalancer.server.port=3000
