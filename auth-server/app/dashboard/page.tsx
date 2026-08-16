@@ -1,5 +1,10 @@
 import { redirect } from "next/navigation";
-import { auth } from "@/lib/auth";
+import { auth, signOut } from "@/lib/auth";
+
+async function handleSignOut() {
+  "use server";
+  await signOut({ redirectTo: "/login" });
+}
 
 export default async function DashboardPage() {
   const session = await auth();
@@ -16,7 +21,7 @@ export default async function DashboardPage() {
           <a href="/settings/password">Şifre değiştir</a>
         </li>
         <li>
-          <form action="/api/auth/signout" method="post" style={{ display: "inline" }}>
+          <form action={handleSignOut} style={{ display: "inline" }}>
             <button type="submit">Çıkış Yap</button>
           </form>
         </li>

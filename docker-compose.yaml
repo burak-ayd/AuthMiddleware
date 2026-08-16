@@ -113,6 +113,8 @@ services:
       - traefik.http.routers.demo.entrypoints=https
       - traefik.http.routers.demo.tls=true
       - traefik.http.routers.demo.tls.certresolver=letsencrypt
-      - traefik.http.routers.demo.middlewares=auth-gateway@file
+      - # forwardAuth middleware is added back in Phase 4 when demo-app
+      #   implements its /login shim + OAuth callback. Until then, demo-app
+      #   is reachable directly to keep the auth-server login flow testable.
       - traefik.http.routers.demo.service=demo-svc
       - traefik.http.services.demo-svc.loadbalancer.server.port=3000
