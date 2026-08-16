@@ -100,7 +100,9 @@ services:
     restart: unless-stopped
     environment:
       PORT: "3000"
-      AUTH_SERVER_URL: http://auth-server:3000
+      # MUST be the PUBLIC URL — used to build authorize redirects sent to
+      # the user's browser.
+      AUTH_SERVER_URL: https://auth.burakaydogan.tk
       DEMO_OAUTH_CLIENT_ID: ${DEMO_OAUTH_CLIENT_ID:-demo-app}
       DEMO_OAUTH_CLIENT_SECRET: ${DEMO_OAUTH_CLIENT_SECRET:?DEMO_OAUTH_CLIENT_SECRET required}
       DEMO_PUBLIC_URL: https://demo.burakaydogan.tk

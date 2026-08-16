@@ -1,9 +1,14 @@
 /**
  * Demo-app OAuth client: build the authorize URL and exchange the code
  * for an access token. Confidential client (Basic auth).
+ *
+ * AUTH_SERVER_URL must be the PUBLIC URL (e.g. https://auth.burakaydogan.tk)
+ * because the authorize URL is sent to the user's browser. Server-side
+ * token + userinfo calls go through Traefik too (slightly slower but
+ * simpler than maintaining two URLs).
  */
 
-const AUTH_URL = process.env.AUTH_SERVER_URL ?? "http://auth-server:3000";
+const AUTH_URL = process.env.AUTH_SERVER_URL ?? "https://auth.burakaydogan.tk";
 export const CLIENT_ID = process.env.DEMO_OAUTH_CLIENT_ID ?? "demo-app";
 const CLIENT_SECRET = process.env.DEMO_OAUTH_CLIENT_SECRET ?? "";
 
