@@ -1,4 +1,3 @@
-npm warn Unknown user config "allow-scripts". This will stop working in the next major version of npm.
 -- CreateSchema
 CREATE SCHEMA IF NOT EXISTS "public";
 
