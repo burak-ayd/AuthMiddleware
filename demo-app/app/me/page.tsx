@@ -1,5 +1,8 @@
 /**
  * /me — Userinfo fetch (Bearer access_token) + simple dashboard.
+ *
+ * Pure RSC: only reads cookies. To clear the access_token, the user clicks
+ * /api/logout (a Route Handler) — RSCs cannot mutate cookies in Next.js 16.
  */
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
@@ -16,9 +19,8 @@ export default async function MePage() {
   try {
     user = await fetchUserInfo(token);
   } catch {
-    // Token expired or invalid — clear and bounce.
-    jar.delete("demo_access_token");
-    redirect("/login");
+    // Token expired or invalid — bounce to logout to clear the cookie.
+    redirect("/api/logout");
   }
 
   return (

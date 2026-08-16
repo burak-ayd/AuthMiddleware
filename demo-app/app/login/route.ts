@@ -1,6 +1,8 @@
 /**
- * /login — PKCE oluştur, state üret, kısa ömürlü cookie'lere yaz,
- * auth-server /api/oauth/authorize'a redirect et.
+ * /login — Route Handler (NOT page) so cookies can be mutated.
+ *
+ * Generates PKCE verifier/challenge + state, stores them in short-lived
+ * cookies, and 302s the browser to the auth-server's authorize endpoint.
  */
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
@@ -9,7 +11,7 @@ import { authorizeUrl } from "@/lib/auth-client";
 
 export const dynamic = "force-dynamic";
 
-export default async function LoginPage() {
+export async function GET() {
   const jar = await cookies();
   const { verifier, challenge } = generatePkce();
   const state = generateState();
