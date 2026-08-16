@@ -17,7 +17,7 @@ Browser → [Traefik: coolify] → forwardAuth → auth-server (Next.js 16)
 ## Status
 
 - [x] **Phase 1** — Repo skeleton + docker-compose (auth-server, postgres, redis, demo-app) + healthcheck
-- [ ] Phase 2 — Prisma schema + NextAuth Credentials + seed user
+- [x] **Phase 2** — Prisma schema + migration + NextAuth Credentials + seed user + `/api/verify` forwardAuth
 - [ ] Phase 3 — OAuth2/OIDC provider (authorize/token/jwks/userinfo)
 - [ ] Phase 4 — Traefik `forwardAuth` middleware + demo-app OAuth callback
 - [ ] Phase 5 — Approval backend (Expo Push + numeric)
@@ -105,8 +105,16 @@ curl -I https://demo.burakaydogan.tk           # → 302 (forwardAuth çalışı
 
 ### 7. İlk kurulumda migration + seed
 
+`Dockerfile` zaten container başlangıcında `npx prisma migrate deploy && npm run db:seed` çalıştırır (idempotent). İlk deploy'da container loglarında seed çıktısını gör:
+
 ```bash
-docker compose exec auth-server npx prisma migrate deploy
+docker compose logs auth-server | grep -A 6 "Seeded primary user"
+```
+
+Şifre **stdout'a yalnız bir kez yazılır** — bir password manager'a kaydet. Şifre `kes.ici0619@gmail.com` ile `/login` üzerinden giriş yapılır.
+
+Eğer seed'i manuel çalıştırmak gerekirse (örn. seed çıktısını kaçırdıysan):
+```bash
 docker compose exec auth-server npm run db:seed
 ```
 
@@ -116,13 +124,17 @@ docker compose exec auth-server npm run db:seed
 
 **VPS'te test:** yukarıdaki "VPS Deployment" bölümünü izle.
 
-## Ports / Endpoints (Phase 1)
+## Ports / Endpoints
 
 | Path | Purpose |
 |---|---|
-| `GET /api/health` | Liveness |
-| `GET /api/ready`  | DB + Redis ping |
-| `GET /`           | Landing page (placeholder) |
+| `GET /api/health`  | Liveness |
+| `GET /api/ready`   | DB + Redis ping |
+| `GET /api/verify`  | Traefik `forwardAuth` — session yoksa 302 `/login?next=...`; varsa 200 + `X-Forwarded-User`/`X-Forwarded-Email` |
+| `GET /login`       | Login form (`?next=…`) |
+| `GET /dashboard`   | Session gerektirir |
+| `GET /settings/password` | Şifre değiştir (session gerektirir) |
+| `POST /api/auth/[...nextauth]` | NextAuth v5 signin / callback / session |
 
 ## File layout
 

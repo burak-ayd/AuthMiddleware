@@ -169,26 +169,29 @@ MiddlewareAuth/
 
 ## 2. Phase 2 — Auth Server: veri modeli + kullanıcı
 
-**Hedef:** Kullanıcı kayıt/giriş, OAuth client kaydı.
+**Hedef:** Kullanıcı kayıt/giriş, OAuth client kaydı. ForwardAuth için `/api/verify` hazır.
 
 ### Adımlar
-- [ ] **2.1** `auth-server/prisma/schema.prisma`:
+- [x] **2.1** `auth-server/prisma/schema.prisma`:
   - `User(id, email unique, passwordHash, displayName, approvalMode enum[push|numeric|both] default 'push', createdAt)`
   - `Device(id, userId, expoPushToken, platform enum[android|ios] default 'android', appVersion, lastSeen)`
   - `OAuthClient(id, clientId unique, clientSecretHash, name, redirectUris string[], allowedScopes, type enum[public|confidential], approvalModeOverride enum[push|numeric|both]? null)`
   - `OAuthCode(code PK, clientId, userId, redirectUri, scope, codeChallenge?, codeChallengeMethod?, expiresAt, consumedAt?)`
   - `PendingApproval(id PK, userId, deviceId?, clientId, requestedScope, appHost, status enum[pending|approved|denied|expired], numericCode? null, expiresAt, createdAt, respondedAt?)`
   - `Session(id, userId, expiresAt, userAgent, ip, revokedAt?)`
-- [ ] **2.2** `prisma migrate dev --name init` → Coolify'da build hook'unda `prisma migrate deploy` çalıştır.
-- [ ] **2.3** Seed script: `kes.ici0619@gmail.com` (password: ilk açılışta set edilecek bir CLI ile), `approvalMode=push`. 1 demo OAuth client (`demo-app`).
-- [ ] **2.4** NextAuth Credentials provider: email+password, Argon2id doğrula, JWT session.
-- [ ] **2.5** `src/app/(auth)/login/page.tsx` — Server Component, form Server Action'a POST.
-- [ ] **2.6** Login sonrası: varsa `?next=...`'e dön; yoksa `/dashboard`.
-- [ ] **2.7** Şifre değiştirme ekranı (`/settings/password`) — ilk kurulum için zorunlu.
+- [x] **2.2** Migration SQL üretildi (`prisma/migrations/0_init/migration.sql`); Dockerfile CMD'de `npx prisma migrate deploy` çalışıyor.
+- [x] **2.3** Seed script: `prisma/seed.ts` — `kes.ici0619@gmail.com` (rastgele 20-char şifre stdout'a yazılır, **bir kez kaydet**), `approvalMode=push`. Demo OAuth client `demo-app` (confidential, redirect `https://demo.burakaydogan.tk/callback`). Idempotent.
+- [x] **2.4** NextAuth v5 (`next-auth@5.0.0-beta.32`) Credentials provider: email+password, Argon2id doğrula, JWT session, `lib/auth.ts`.
+- [x] **2.5** `app/login/page.tsx` (RSC) + `LoginForm.tsx` (client, `useActionState`) + `actions.ts` (server action, `signIn("credentials", ...)`).
+- [x] **2.6** Login sonrası `?next=...` (güvenli: sadece `/` ile başlayan path'ler); yoksa `/dashboard`. Redirect to: server action'da `signIn` `redirectTo` parametresi.
+- [x] **2.7** Şifre değiştirme ekranı (`/settings/password`) — Argon2id re-hash ile zorunlu.
+- [x] **2.8** `/api/verify` (forwardAuth): session yoksa 302 `/login?next=<x-forwarded-uri>`; varsa 200 + `X-Forwarded-User` / `X-Forwarded-Email`.
 
 ### Kabul
-- DB migrate başarılı.
-- Seed user ile giriş, session cookie oluşur (`__Host-auth.session`).
+- Container başlangıcında `migrate deploy` + seed (idempotent) çalışır.
+- Seed user `kes.ici0619@gmail.com` ile `/login` üzerinden giriş yapılır, NextAuth JWT cookie oluşur.
+- `/dashboard` ve `/settings/password` session gerektirir.
+- Demo uygulamasının router'ına `auth-gateway@file` middleware eklendiğinde → 302 → `/login?next=...` → login → cookie → orijinal URL'e 200.
 
 ---
 

@@ -23,7 +23,7 @@ RUN npm run build
 # --- runner ---------------------------------------------------------
 # libstdc++ required at runtime by argon2's compiled .node binding.
 FROM node:20-alpine AS runner
-RUN apk add --no-cache openssl libstdc++
+RUN apk add --no-cache openssl libstdc++ bash
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
@@ -36,8 +36,8 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
-# Copy full node_modules so argon2 native binding (and its runtime deps) are present
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
+COPY --from=builder --chown=nextjs:nodejs /app/scripts ./scripts
 
 USER nextjs
 EXPOSE 3000
@@ -46,4 +46,5 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
   CMD wget -qO- http://127.0.0.1:3000/api/health || exit 1
 
-CMD ["node", "server.js"]
+# Run migrations + seed (idempotent) then start the server.
+CMD ["sh", "-c", "npx prisma migrate deploy && npm run db:seed; exec node server.js"]
