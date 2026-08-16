@@ -1,6 +1,12 @@
 #!/usr/bin/env node
-// Generate RS256 keypair for JWT signing (PEM base64-encoded for env vars).
-// Usage: node scripts/gen-jwt-keys.mjs
+// Generate RS256 keypair for JWT signing (PEM-encoded for env vars).
+//
+// Usage:
+//   node scripts/gen-jwt-keys.mjs
+//
+// Pastes single-line PEM strings into .env. Newlines in PEM are escaped
+// as literal "\n" (two characters), which lib/jwt.ts decodes back to
+// real newlines at runtime.
 
 import crypto from "node:crypto";
 
@@ -10,9 +16,9 @@ const { publicKey, privateKey } = crypto.generateKeyPairSync("rsa", {
   privateKeyEncoding: { type: "pkcs8", format: "pem" },
 });
 
-const privB64 = Buffer.from(privateKey).toString("base64");
-const pubB64 = Buffer.from(publicKey).toString("base64");
+// Collapse PEM to single line with escaped newlines so it fits in .env.
+const oneline = (pem) => pem.replace(/\r?\n/g, "\\n");
 
 console.log("# Paste into .env as:");
-console.log(`JWT_PRIVATE_KEY='${privB64}'`);
-console.log(`JWT_PUBLIC_KEY='${pubB64}'`);
+console.log(`JWT_PRIVATE_KEY='${oneline(privateKey)}'`);
+console.log(`JWT_PUBLIC_KEY='${oneline(publicKey)}'`);
