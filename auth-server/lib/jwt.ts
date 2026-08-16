@@ -23,7 +23,23 @@ let _cache:
 function pemEnv(name: string): string {
   const v = process.env[name];
   if (!v) throw new Error(`${name} not configured`);
-  return v.replace(/\\n/g, "\n");
+
+  // Fast path: literal "\n" markers collapse to real PEM newlines.
+  let pem = v.replace(/\\n/g, "\n");
+
+  // Legacy path: the old gen-jwt-keys.mjs base64-encoded the PEM string.
+  // If we don't see a PEM header, attempt one base64 decode to recover it.
+  if (!/-----BEGIN (RSA )?(PRIVATE|PUBLIC) KEY-----/.test(pem)) {
+    try {
+      const decoded = Buffer.from(pem.replace(/\s+/g, ""), "base64").toString("utf8");
+      if (/-----BEGIN (RSA )?(PRIVATE|PUBLIC) KEY-----/.test(decoded)) {
+        pem = decoded;
+      }
+    } catch {
+      // fall through with original value; jose will throw a clearer error.
+    }
+  }
+  return pem;
 }
 
 async function loadKeys() {
