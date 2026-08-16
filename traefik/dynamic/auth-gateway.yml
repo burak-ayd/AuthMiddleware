@@ -1,0 +1,25 @@
+# Traefik file provider dynamic config — auth-gateway middleware
+#
+# This is the ROBUST way to define the shared forwardAuth middleware.
+# Container-label middleware (docker-compose.yml) only exists while the
+# auth-server container is UP. A file-provider middleware always exists.
+#
+# HOW TO USE (VPS host, not this repo):
+#   Traefik reads /traefik/dynamic/ which is mounted from /data/coolify/proxy/.
+#   1) Copy this file to the VPS:
+#        scp traefik/dynamic/auth-gateway.yml root@<VPS_IP>:/data/coolify/proxy/dynamic/
+#   2) Traefik watches the directory (--providers.file.watch=true), auto-reloads.
+#
+# IMPORTANT: if you enable this file provider, REMOVE the equivalent
+# auth-gateway labels from docker-compose.yml (auth-server service) to
+# avoid a duplicate-middleware conflict.
+
+http:
+  middlewares:
+    auth-gateway:
+      forwardAuth:
+        address: "http://auth-server:3000/api/verify"
+        trustForwardHeader: true
+        authResponseHeaders:
+          - "X-Forwarded-User"
+          - "X-Forwarded-Email"

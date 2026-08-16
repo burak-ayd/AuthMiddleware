@@ -75,10 +75,9 @@ services:
       - traefik.http.routers.auth.tls.certresolver=letsencrypt
       - traefik.http.routers.auth.service=auth-svc
       - traefik.http.services.auth-svc.loadbalancer.server.port=3000
-      # forwardAuth middleware (used by other routers)
-      - traefik.http.middlewares.auth-gateway.forwardauth.address=http://auth-server:3000/api/verify
-      - traefik.http.middlewares.auth-gateway.forwardauth.trustForwardHeader=true
-      - traefik.http.middlewares.auth-gateway.forwardauth.authResponseHeaders=X-Forwarded-User,X-Forwarded-Email
+      # NOTE: forwardAuth middleware is defined in traefik/dynamic/auth-gateway.yml
+      # (file provider) so it exists even when this container is down.
+      # Reference it as: auth-gateway@file
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
       interval: 30s
@@ -106,6 +105,6 @@ services:
       - traefik.http.routers.demo.entrypoints=https
       - traefik.http.routers.demo.tls=true
       - traefik.http.routers.demo.tls.certresolver=letsencrypt
-      - traefik.http.routers.demo.middlewares=auth-gateway@docker
+      - traefik.http.routers.demo.middlewares=auth-gateway@file
       - traefik.http.routers.demo.service=demo-svc
       - traefik.http.services.demo-svc.loadbalancer.server.port=3000

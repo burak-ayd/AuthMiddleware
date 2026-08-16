@@ -83,11 +83,17 @@ demo.burakaydogan.tk  A  <VPS_IP>
 ### 5. Build & Start
 
 ```bash
+# ÖNEMLİ: forwardAuth middleware'i file provider'dan gelir.
+# VPS'te Traefik'in dynamic config dizinine kopyala (Traefik watch modda otomatik alır):
+mkdir -p /data/coolify/proxy/dynamic
+cp traefik/dynamic/auth-gateway.yml /data/coolify/proxy/dynamic/
+
 docker compose up -d --build
 docker compose ps   # auth-postgres, auth-redis healthy; auth-server, demo-app up
 ```
 
 > Traefik docker provider yeni servisleri anında bulur — restart gerekmez.
+> Middleware referansı: `auth-gateway@file` (docker provider değil!).
 
 ### 6. Doğrula
 
