@@ -6,9 +6,11 @@ RUN apk add --no-cache openssl
 WORKDIR /app
 
 # --- deps -----------------------------------------------------------
+# argon2 is a native module: needs build tools to compile on Alpine (musl).
 FROM base AS deps
+RUN apk add --no-cache python3 make g++
 COPY package.json package-lock.json* ./
-RUN npm ci --silent
+RUN npm ci
 
 # --- builder --------------------------------------------------------
 FROM base AS builder
@@ -19,7 +21,9 @@ RUN npx prisma generate
 RUN npm run build
 
 # --- runner ---------------------------------------------------------
-FROM base AS runner
+# libstdc++ required at runtime by argon2's compiled .node binding.
+FROM node:20-alpine AS runner
+RUN apk add --no-cache openssl libstdc++
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
@@ -32,11 +36,8 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
-COPY --from=builder /app/node_modules/jose ./node_modules/jose
-COPY --from=builder /app/node_modules/ioredis ./node_modules/ioredis
-COPY --from=builder /app/node_modules/argon2 ./node_modules/argon2
+# Copy full node_modules so argon2 native binding (and its runtime deps) are present
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
 
 USER nextjs
 EXPOSE 3000

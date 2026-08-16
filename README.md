@@ -27,26 +27,88 @@ Browser → [Traefik: coolify] → forwardAuth → auth-server (Next.js 16)
 
 See `plan.md` for full plan.
 
+## VPS Deployment (Traefik + Coolify network)
+
+Traefik zaten VPS'te çalışıyor (`traefik-proxy.yml`): network `coolify`, ACME `letsencrypt`
+(Cloudflare DNS challenge), port 443 açık, port 80 kapalı. Bu repo yalnızca uygulamaları ayağa kaldırır.
+
+### 1. Repo'yu VPS'e taşı
+
+```bash
+# Windows (bu klasörde) — commit attıktan sonra
+git remote add origin https://github.com/<kullanıcı>/<repo>.git
+git push -u origin master
+
+# VPS
+git clone https://github.com/<kullanıcı>/<repo>.git
+cd <repo>
+```
+
+> `.env` gitignore'da — push edilmez, VPS'te oluşturulur.
+
+### 2. Ön koşullar (bir kez)
+
+```bash
+docker --version && docker compose version          # Docker kurulu mu?
+docker network ls | grep coolify                    # coolify network var mı?
+```
+
+- Docker yoksa: `curl -fsSL https://get.docker.com | sh`
+- `coolify` network adı farklıysa: `docker inspect coolify-proxy --format '{{range $k,$v := .NetworkSettings.Networks}}{{$k}} {{end}}'` ile gerçek adı bul, `docker-compose.yml`'deki `name: coolify`'ı güncelle.
+
+### 3. `.env` oluştur
+
+```bash
+cp .env.example .env
+```
+
+| Değişken | Nasıl |
+|---|---|
+| `AUTH_SECRET` | `openssl rand -base64 32` |
+| `JWT_PRIVATE_KEY` / `JWT_PUBLIC_KEY` | `node scripts/gen-jwt-keys.mjs` |
+| `EXPO_ACCESS_TOKEN` | şimdilik boş (Phase 5) |
+
+Alternatif: lokalde üretilen `.env`'i SCP ile kopyala (aynı key'ler tutarlı kalır):
+```bash
+scp .env root@<VPS_IP>:/path/to/<repo>/
+```
+
+### 4. DNS kayıtları (Cloudflare)
+
+```
+auth.burakaydogan.tk  A  <VPS_IP>
+demo.burakaydogan.tk  A  <VPS_IP>
+```
+
+### 5. Build & Start
+
+```bash
+docker compose up -d --build
+docker compose ps   # auth-postgres, auth-redis healthy; auth-server, demo-app up
+```
+
+> Traefik docker provider yeni servisleri anında bulur — restart gerekmez.
+
+### 6. Doğrula
+
+```bash
+curl https://auth.burakaydogan.tk/api/health   # → {"ok":true,"service":"auth-server"}
+curl https://auth.burakaydogan.tk/api/ready    # → {"ok":true,"checks":{"db":"ok","redis":"ok"}}
+curl -I https://demo.burakaydogan.tk           # → 302 (forwardAuth çalışıyor)
+```
+
+### 7. İlk kurulumda migration + seed
+
+```bash
+docker compose exec auth-server npx prisma migrate deploy
+docker compose exec auth-server npm run db:seed
+```
+
 ## Development (Windows → deploy to Linux VPS)
 
 **Lokal:** Windows'ta sadece editör. Build için Node 24 gerekli (`nvm4w`).
 
-**VPS'te test:**
-1. Repo'yu VPS'e push/clone et.
-2. `coolify` network mevcut olmalı (Coolify kuruluysa otomatik). Değilse:
-   ```bash
-   docker network create coolify
-   ```
-3. `cp .env.example .env` ve secret'ları doldur:
-   - `AUTH_SECRET` — `openssl rand -base64 32`
-   - `JWT_PRIVATE_KEY` / `JWT_PUBLIC_KEY` — `node scripts/gen-jwt-keys.mjs`
-4. Local DNS (VPS /etc/hosts veya Pi-hole):
-   ```
-   <VPS_IP>   auth.burakaydogan.tk
-   <VPS_IP>   demo.burakaydogan.tk
-   ```
-5. `docker compose up -d --build`
-6. `https://auth.burakaydogan.tk/api/health` → `{"ok":true}`
+**VPS'te test:** yukarıdaki "VPS Deployment" bölümünü izle.
 
 ## Ports / Endpoints (Phase 1)
 
