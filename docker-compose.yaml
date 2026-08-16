@@ -69,7 +69,7 @@ services:
       - coolify.managed=true
       - traefik.enable=true
       - traefik.docker.network=coolify
-      - traefik.http.routers.auth.rule=Host(`${PUBLIC_HOST:-auth.burakaydogan.tk}`)
+      - traefik.http.routers.auth.rule=Host(`auth.burakaydogan.tk`)
       - traefik.http.routers.auth.entrypoints=https
       - traefik.http.routers.auth.tls=true
       - traefik.http.routers.auth.tls.certresolver=letsencrypt
@@ -102,7 +102,7 @@ services:
       - coolify.managed=true
       - traefik.enable=true
       - traefik.docker.network=coolify
-      - traefik.http.routers.demo.rule=Host(`${DEMO_HOST:-demo.burakaydogan.tk}`)
+      - traefik.http.routers.demo.rule=Host(`demo.burakaydogan.tk`)
       - traefik.http.routers.demo.entrypoints=https
       - traefik.http.routers.demo.tls=true
       - traefik.http.routers.demo.tls.certresolver=letsencrypt
