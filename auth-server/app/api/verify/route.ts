@@ -32,6 +32,20 @@ function safeNext(raw: string | null): string {
   return raw;
 }
 
+function pathFromForwardedUri(raw: string | null): string {
+  // Traefik X-Forwarded-Uri genelde relative path (/api/...) döndürür ama
+  // bazı konfigürasyonlarda full URL (https://host/...) gelebilir.
+  // Her durumda sadece path + query'yi al.
+  if (!raw) return "/";
+  if (raw.startsWith("/")) return raw;
+  try {
+    const u = new URL(raw);
+    return u.pathname + u.search;
+  } catch {
+    return "/";
+  }
+}
+
 function authHostFrom(req: NextRequest): { proto: string; host: string } {
   // Prefer the public host Traefik forwarded; fall back to the Host header.
   const proto = req.headers.get("x-forwarded-proto") ?? "https";
@@ -43,13 +57,21 @@ function authHostFrom(req: NextRequest): { proto: string; host: string } {
 }
 
 async function handle(req: NextRequest) {
+  // Use x-forwarded-uri's path so the next= param is a same-origin relative.
   const originalPath = safeNext(
-    req.headers.get("x-forwarded-uri") ?? req.headers.get("x-original-url"),
+    pathFromForwardedUri(
+      req.headers.get("x-forwarded-uri") ??
+        req.headers.get("x-original-url"),
+    ),
   );
 
   const session = await auth();
   if (!session?.user?.id) {
     const { proto, host } = authHostFrom(req);
+    // We redirect to the UPSTREAM host (e.g. demo.burakaydogan.tk) so the
+    // user's browser reaches the protected app's own /login shim, which
+    // in turn kicks off the OAuth flow. The upstream app reads the
+    // original path from `next` and resumes there after login.
     const loginUrl = `${proto}://${host}/login?next=${encodeURIComponent(originalPath)}`;
     return NextResponse.redirect(loginUrl, { status: 302 });
   }

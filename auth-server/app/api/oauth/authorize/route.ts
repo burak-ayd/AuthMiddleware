@@ -33,12 +33,14 @@ type Params = {
   nonce?: string;
 };
 
-function buildAuthorizeUrl(req: NextRequest, params: Params): string {
-  const url = new URL("/api/oauth/authorize", req.url);
+function buildAuthorizePath(req: NextRequest, params: Params): string {
+  // Reconstruct the path + query so the user returns here after login.
+  const sp = req.nextUrl.searchParams;
+  const out = new URLSearchParams();
   for (const [k, v] of Object.entries(params)) {
-    if (v !== undefined) url.searchParams.set(k, v);
+    if (v !== undefined) out.set(k, v);
   }
-  return url.toString();
+  return `/api/oauth/authorize?${out.toString()}`;
 }
 
 export async function GET(req: NextRequest) {
@@ -92,7 +94,7 @@ export async function GET(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
     // Bounce through /login, preserving the OAuth params on the way back.
-    redirect(`/login?next=${encodeURIComponent(buildAuthorizeUrl(req, params))}`);
+    redirect(`/login?next=${encodeURIComponent(buildAuthorizePath(req, params))}`);
   }
 
   // 5. Mint authorization code (single-use, 60s TTL)
