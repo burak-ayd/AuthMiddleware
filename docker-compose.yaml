@@ -102,6 +102,8 @@ services:
       PORT: "3000"
       AUTH_SERVER_URL: http://auth-server:3000
       DEMO_OAUTH_CLIENT_ID: ${DEMO_OAUTH_CLIENT_ID:-demo-app}
+      DEMO_OAUTH_CLIENT_SECRET: ${DEMO_OAUTH_CLIENT_SECRET:?DEMO_OAUTH_CLIENT_SECRET required}
+      DEMO_PUBLIC_URL: https://demo.burakaydogan.tk
       NODE_ENV: production
     depends_on:
       - auth-server
@@ -113,8 +115,16 @@ services:
       - traefik.http.routers.demo.entrypoints=https
       - traefik.http.routers.demo.tls=true
       - traefik.http.routers.demo.tls.certresolver=letsencrypt
-      # forwardAuth middleware is added back in Phase 4 when demo-app
-      #   implements its /login shim + OAuth callback. Until then, demo-app
-      #   is reachable directly to keep the auth-server login flow testable.
+      # Protected by the auth-server's forwardAuth middleware.
+      # /login and /callback must remain reachable WITHOUT a session so the
+      # login flow can complete — handled by the priority rule below.
+      - traefik.http.routers.demo.middlewares=auth-gateway@file
       - traefik.http.routers.demo.service=demo-svc
       - traefik.http.services.demo-svc.loadbalancer.server.port=3000
+      # /login bypass — higher priority rule for the OAuth bootstrap route.
+      - traefik.http.routers.demo-auth-bypass.rule=Host(`demo.burakaydogan.tk`) && (Path(`/login`) || Path(`/callback`))
+      - traefik.http.routers.demo-auth-bypass.entrypoints=https
+      - traefik.http.routers.demo-auth-bypass.tls=true
+      - traefik.http.routers.demo-auth-bypass.tls.certresolver=letsencrypt
+      - traefik.http.routers.demo-auth-bypass.priority=100
+      - traefik.http.routers.demo-auth-bypass.service=demo-svc

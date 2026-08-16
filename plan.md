@@ -195,28 +195,44 @@ MiddlewareAuth/
 
 ---
 
-## 3. Phase 3 — OAuth2/OIDC Provider
+## 3. Phase 3 — OAuth2/OIDC Provider (Phase 3a: çekirdek, 3b: onay flow'u)
 
-**Hedef:** Auth server başka uygulamalara "Sign in with my-auth" sunar.
+**Hedef:** Auth server başka uygulamalara "Sign in with my-auth" sunar. Demo-app uçtan uca OAuth2 code flow ile korunur.
 
-### Adımlar
-- [ ] **3.1** `src/lib/jwt.ts` — RS256 anahtar çifti (env'den PEM), `sign(payload, ttl)`, `verify()`, JWK export.
-- [ ] **3.2** `src/app/api/oauth/jwks/route.ts` — public JWKS (Traefik ve uygulamalar buradan public key alır).
-- [ ] **3.3** `src/app/api/oauth/authorize/route.ts`:
-  - validate `client_id`, `redirect_uri` (exact match), `scope`, `state`, `code_challenge`, `code_challenge_method=S256`.
-  - Session yoksa → `/login?next=/api/oauth/authorize?...`.
-  - Session var, scope `openid profile email` → `PendingApproval` INSERT → mod'a göre push veya numeric → `/approve?req=ID` sayfası.
-- [ ] **3.4** `src/app/api/oauth/token/route.ts` — `grant_type=authorization_code`:
-  - code'u consume et, `code_verifier` doğrula (PKCE).
-  - access_token (JWT, 15min) + refresh_token (opak, 30 gün, DB'de hashed).
-  - `grant_type=refresh_token` rotasyonu.
-- [ ] **3.5** `src/app/api/oauth/userinfo/route.ts` — Bearer token ile user claim'leri.
-- [ ] **3.6** `src/lib/oauth.ts` — `generateCode()`, `hashSecret()`, PKCE doğrulama (S256).
-- [ ] **3.7** Approval başarılıysa → `/api/oauth/authorize`'a code ile redirect.
+### Phase 3a — Çekirdek (telefon onayı olmadan)
 
-### Kabul
-- `curl /api/oauth/jwks` geçerli JWK döner.
-- Manuel akış: `/api/oauth/authorize?client_id=demo-app&...` → code al → `/api/oauth/token` ile access_token → `/api/oauth/userinfo` 200.
+- [x] **3.1** `auth-server/lib/jwt.ts` — RS256 (jose), `signAccessToken` (15dk), `verifyAccessToken`, `getJwks`. PEM'ler env'den.
+- [x] **3.2** `auth-server/app/api/oauth/jwks/route.ts` — public JWKS endpoint.
+- [x] **3.3** `auth-server/lib/oauth.ts` — PKCE verify (S256 + plain, timing-safe), scope parse, random token.
+- [x] **3.4** `auth-server/app/api/oauth/authorize/route.ts` — validate client_id + redirect_uri (exact match) + scope + state + PKCE; session varsa `OAuthCode` INSERT → redirect(client.redirect_uri)?code=...&state=...; session yoksa `/login?next=<this URL>`.
+- [x] **3.5** `auth-server/app/api/oauth/token/route.ts` — `grant_type=authorization_code`: Basic auth (client_id:secret), PKCE verify, code single-use, access_token (JWT RS256 15dk) döner. **Refresh token Phase 3b'de.**
+- [x] **3.6** `auth-server/app/api/oauth/userinfo/route.ts` — Bearer JWT → scope'a göre sub/email/name claim'leri.
+- [x] **3.7** `demo-app/lib/oauth-client.ts` — PKCE generator, state, timing-safe equal.
+- [x] **3.8** `demo-app/lib/auth-client.ts` — `authorizeUrl`, `exchangeCode` (Basic auth), `fetchUserInfo` (Bearer).
+- [x] **3.9** `demo-app/app/login/page.tsx` — PKCE üret, short-lived cookie'lere yaz, redirect auth-server authorize'a.
+- [x] **3.10** `demo-app/app/callback/page.tsx` — state doğrula, code exchange, access_token cookie'ye sakla, /me'ye redirect.
+- [x] **3.11** `demo-app/app/me/page.tsx` — cookie'den access_token al, userinfo fetch, göster.
+- [x] **3.12** `demo-app/app/api/logout/route.ts` — cookie sil, /login'e redirect.
+
+### Phase 3b — Onay flow'u (Phase 5 ile birleşik)
+
+- [ ] **3.13** `auth-server/app/approve/page.tsx` — PendingApproval ID ile onay/red sayfası.
+- [ ] **3.14** `/api/approval/request`, `/respond`, `/poll/:id`, `/verify-numeric` (Phase 5).
+- [ ] **3.15** `/api/oauth/authorize` → PendingApproval INSERT → `/approve?req=ID` sayfası, onay sonrası code redirect.
+- [ ] **3.16** `auth-server/app/api/oauth/token/route.ts` — refresh_token ekle (opak, DB'de SHA256 hash'li, 30 gün, rotation).
+
+### Phase 4 — Traefik forwardAuth + App Gateway
+
+- [x] **4.1** `auth-server/app/api/verify/route.ts` — session varsa 200 + `X-Forwarded-User`/`-Email`; yoksa 302 `/login?next=<x-forwarded-uri>`. Host `X-Forwarded-Host`'tan, redirect güvenli (`/` ile başlayan path).
+- [x] **4.2** `traefik/dynamic/auth-gateway.yml` — file-provider middleware (`auth-gateway@file`), forwardAuth `auth-server:3000/api/verify`.
+- [x] **4.3** `docker-compose.yaml` — demo-app router'a `auth-gateway@file` middleware; `/login` + `/callback` bypass (priority 100).
+- [x] **4.4** Dockerfile'a migrate + seed (idempotent) zaten eklendi (Phase 2).
+
+### Kabul (Phase 3a + 4)
+- `curl https://auth.burakaydogan.tk/api/oauth/jwks` → geçerli JWK set.
+- `curl https://demo.burakaydogan.tk` → Traefik 302 → `https://auth.burakaydogan.tk/login?next=/` → login → `https://demo.burakaydogan.tk/callback?code=...` → `/me` → "Signed in as kes.ici0619@gmail.com (verified)".
+- `/api/logout` → cookie sil, `/login`'e redirect.
+- `curl https://auth.burakaydogan.tk/api/oauth/userinfo -H "Authorization: Bearer <token>"` → user claim'leri.
 
 ---
 
